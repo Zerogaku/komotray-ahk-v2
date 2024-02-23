@@ -9,14 +9,34 @@
 
 ;MsgBox "Currently running Komodo"
 
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+
 ;#Include lib\JSONGO\jsongo.v2.ahk
 #Include lib\CJSON\JSON.ahk
 
-
 global IconPath := A_ScriptDir . "/assets/icons/"
 global KomorebiConfig := "C:\Users\Null\komorebi.json"
+
+
+; Set up tray menu
+; Menu, Tray, NoStandard
+; Menu, Tray, add, Pause Komorebi, PauseKomorebi
+; Menu, Tray, add, Restart Komorebi, StartKomorebi
+; Menu, Tray, add  ; separator line
+; Menu, Tray, add, Reload Tray, ReloadTray
+; Menu, Tray, add, Exit Tray, ExitTray
+
+A_TrayMenu.Delete()
+A_TrayMenu.Add("Pause Komorebi", PauseKomorebi)
+A_TrayMenu.Add("Restart Komorebi", StartKomorebi)
+A_TrayMenu.Add()
+A_TrayMenu.Add("Reload Tray", ReloadTray)
+A_TrayMenu.Add("Exit tray", ExitTray)
+
 IconState := -1
 global Screen := 0
+global LastTaskbarScroll := 0
 
 ;if (ProcessExist("komorebi.exe")) {
 ;    StartKomorebi(false)
@@ -89,20 +109,22 @@ UpdateIcon(paused, screen, workspace, screenName, workspaceName) {
     }
 }
 
-; StartKomorebi(reloadTray:=true) {
-;     Komorebi("stop")
-;     Komorebi("start -c " . KomorebiConfig . " --ahk")
-;     if (reloadTray) {
-;         ReloadTray()
-;     }
-; }
+StartKomorebi(*) {
+    Komorebi("stop")
+    Komorebi("start -c " . KomorebiConfig . " --ahk")
+    ReloadTray()
+}
 
-; ReloadTray() {
-;     DllCall("CloseHandle", "Ptr", Pipe)
-;     Reload
-; }
+ReloadTray(*) {
+    DllCall("CloseHandle", "Ptr", Pipe)
+    Reload
+}
 
-ExitTray() {
+PauseKomorebi(*) {
+    Komorebi("toggle-pause")
+}
+
+ExitTray(*) {
     DllCall("CloseHandle", "Ptr", Pipe)
     Komorebi("stop")
     ExitApp
