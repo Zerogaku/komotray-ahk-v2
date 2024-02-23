@@ -1,0 +1,1 @@
+../komotray.ahk
