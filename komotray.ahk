@@ -8,13 +8,13 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
-;#Include lib\JSONGO\jsongo.v2.ahk
 #Include lib\CJSON\JSON.ahk
 
 ; Set common config options
+global USERPROFILE := EnvGet("USERPROFILE")
 AutoStartKomorebi := true
 global IconPath := A_ScriptDir . "/assets/icons/"
-global KomorebiConfig := "C:\Users\Null\komorebi.json"
+global KomorebiConfig := USERPROFILE . "\komorebi.json"
 
 ; ======================================================================
 ; Initialization
