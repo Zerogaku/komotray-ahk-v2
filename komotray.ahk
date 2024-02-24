@@ -29,7 +29,7 @@ A_TrayMenu.Add("Reload Tray", ReloadTray)
 A_TrayMenu.Add("Exit tray", ExitTray)
 
 ; Define default action and activate it with single click
-A_TrayMenu.Default("Pause Komorebi")
+A_TrayMenu.Default := "Pause Komorebi"
 A_TrayMenu.ClickCount := 1
 
 ; Initialize internal states
@@ -67,14 +67,20 @@ if (Pipe = -1) {
 ; Wait for Komorebi to connect
 Komorebi("subscribe " . PipeName)
 DllCall("ConnectNamedPipe", "Ptr", Pipe, "Ptr", 0) ; set PipeMode = nowait to avoid getting stuck when paused
+; if (!DllCall("ConnectNamedPipe", "Ptr", Pipe, "Ptr", 0)) {
+;     MsgBox "Error connecting named pipe: " A_LastError
+;     ExitApp
+; }
 
 
 ; Subscribe to Komorebi events
 BytesToRead := 0
 Bytes:= 0
+; Data:=''
 Loop {
     ; Continue if buffer is empty
-    ExitCode := DllCall("PeekNamedPipe", "Ptr", Pipe, "Ptr", 0, "UInt", 1, "Ptr", 0, "UintP", BytesToRead, "Ptr", 0)
+    ExitCode := DllCall("PeekNamedPipe", "Ptr", Pipe, "Ptr", 0, "UInt", 1, "Ptr", 0, "UintP", &BytesToRead, "Ptr", 0)
+    ; MsgBox "The exitcode is: " ExitCode " the BytesToRead is: " BytesToRead
 
     if (!ExitCode || !BytesToRead) {
         Sleep 50
@@ -82,24 +88,35 @@ Loop {
     }
 
     ; Read the buffer
-    VarSetStrCapacity(&Data, BufferSize)
-    DllCall("ReadFile", "Ptr", Pipe, "Str", Data, "UInt", BufferSize, "UintP", Bytes, "Ptr", 0)
-
+    ; VarSetStrCapacity(&Data, BufferSize)
+    Data := Buffer(BufferSize, 0)
+    DllCall("ReadFile", "Ptr", Pipe,
+            "Ptr", Data.Ptr,
+            "UInt", BufferSize,
+            "UintP", &Bytes,
+            "Ptr", 0)
+    ; TestData := StrGet(&Data, Bytes, "UTF-8")
+    ; MsgBox "testing" TestData
+    ; MsgBox "Buffersize is: " BufferSize " Bytes is: " Bytes
+    ; MsgBox "Data is: " Data
     ; Strip new lines
+    ; MsgBox Bytes
     if (Bytes <= 1) {
         continue
     }
 
-    State := JSON.Load(StrGet(&Data, Bytes, "UTF-8")).state
-    Paused := State.is_paused
-    Screen := State.monitors.focused
-    ScreenQ := State.monitors.elements[Screen + 1]
-    Workspace := ScreenQ.workspaces.focused
-    WorkspaceQ := ScreenQ.workspaces.elements[Workspace + 1]
+    dataString := StrGet(Data, Bytes, "UTF-8")
+    ; MsgBox dataString
+    State := JSON.Load(dataString)["state"]
+    Paused := State["is_paused"]
+    Screen := State["monitors"]["focused"]
+    ScreenQ := State["monitors"]["elements"][Screen + 1]
+    Workspace := ScreenQ["workspaces"]["focused"]
+    WorkspaceQ := ScreenQ["workspaces"]["elements"][Workspace + 1]
 
     ; Update tray icon
     if (Paused | Screen << 1 | Workspace << 4 != IconState) {
-       UpdateIcon(Paused, Screen, Workspace, ScreenQ.name, WorkspaceQ.name)
+       UpdateIcon(Paused, Screen, Workspace, ScreenQ["name"], WorkspaceQ["name"])
        IconState := Paused | Screen << 1 | Workspace << 4 ; use 3 bits for monitor (i.e. up to 8 monitors)
     }
 }
@@ -113,21 +130,29 @@ Loop {
 !WheelDown::ScrollWorkspace("next")
 
 ; Scroll taskbar to cycle workspaces
-#Hotif MouseIsOver("ahk_class Shell_TrayWnd") || MouseIsOver("ahk_class Shell_SecondaryTrayWnd")
-    WheelUp::ScrollWorkspace("previous")
-    WheelDown::ScrollWorkspace("next")
-#Hotif
+; #Hotif MouseIsOver("ahk_class Shell_TrayWnd") || MouseIsOver("ahk_class Shell_SecondaryTrayWnd")
+;     WheelUp::ScrollWorkspace("previous")
+;     WheelDown::ScrollWorkspace("next")
+; #Hotif
 
 ; ======================================================================
 ; Functions
 ; ======================================================================
 
+; if komorebic is unresponsive, any command that uses komorebic will create extra instances, as the previous commands will stall, replacing RunWait with Run instead, is just a temporary thing for the script itself, if komorebic is still unresponsive then new instances will still spawn, killing the instances in taskmanager is the solution
 Komorebi(arg) {
     RunWait("komorebic.exe " . arg, , "Hide")
 }
 
 UpdateIcon(paused, screen, workspace, screenName, workspaceName) {
-    TrayTip workspaceName . " on " . screenName
+
+    ; Show TrayTip on workspace switch, a bit jarring though
+    ; TrayTip workspaceName . " on " . screenName, , 16
+    ; SetTimer HideTrayTip, -800
+    ; HideTrayTip(){
+    ;   TrayTip 
+    ; }
+
     icon := IconPath . workspace + 1 . "-" . screen + 1 . ".ico"
     if (!paused && FileExist(icon)) {
         TraySetIcon icon
@@ -159,7 +184,7 @@ ExitTray(*) {
 }
 
 ScrollWorkspace(dir) {
-    ; This adds a state-dependent debounce timer to adress an issue where a single wheel
+    ; This adds a state-dependent debounce timer to address an issue where a single wheel
     ; click spawns multiple clicks when a web browser is in focus.
     _isBrowser := WinActive("ahk_class Chrome_WidgetWin_1") || WinActive("ahk_class MozillaWindowClass")
     _t := _isBrowser ? 800 : 100
