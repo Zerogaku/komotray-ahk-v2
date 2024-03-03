@@ -126,8 +126,8 @@ Loop {
 ; ======================================================================
 
 ; Alt + scroll to cycle workspaces
-!WheelUp::ScrollWorkspace("previous")
-!WheelDown::ScrollWorkspace("next")
+; !WheelUp::ScrollWorkspace("previous")
+; !WheelDown::ScrollWorkspace("next")
 
 ; Scroll taskbar to cycle workspaces
 ; #Hotif MouseIsOver("ahk_class Shell_TrayWnd") || MouseIsOver("ahk_class Shell_SecondaryTrayWnd")
